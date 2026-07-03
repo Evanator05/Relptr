@@ -3,28 +3,37 @@
 #include <vector>
 #include <stdio.h>
 
+
+
 int main(int argc, char* argv[]) {
     std::vector<uint64_t> numbers{0, 0, 69, 0, 0};
+    
+    // create relptr base for the numbers vector
+    // in a real world application you would probably define this in the header file for whatever you are doing
+    using NumbersBase = RelptrBaseVector<RELPTR_TAG(NUMBERSBASE), uint64_t>;
 
-    // binding the numbers array to the base indexer
-    RelptrBaseVector<
-        struct NumbersBase, // use 'struct BaseName' to pick a name for all Relptrs to use as the base. Prefixing with struct to allow freetyping a name
-        uint64_t // the type of data stored at this base
-        >::set_base(numbers); 
+    // bind the NumbersBase to the numbers vector
+    NumbersBase::set_base(numbers); 
 
     Relptr<
-        uint64_t, // the type of data stored at the pointer
-        RelptrBaseVector< // the indexer for grabbing the pointer base
-            struct NumbersBase, // using 'struct BaseName' to pick what base to use for this Relptr
-            uint64_t // the type of data stored at the base
-            >, 
-        uint32_t // the type of integer used to offset from the base (could be a uint8_t for up to 255 offset ect)
+        NumbersBase, // the base to use for this relptr
+        uint32_t // the type of integer used to offset from the base (could be a uint8_t for up to 255 offset ect) this value is optional and will default to uint32_t
         > testPtr{2}; // creating the relptr with an index of 2 bound to the numbers vector
 
+    Relptr<NumbersBase> testPtr2{}; // not defining type of offset because it defaults to uint32_t
+
+    // the following 2 lines do the exact same thing just showing there are multiple ways of setting it
+    testPtr2 = 2; // set testptr to index 2 
+    testPtr2 = &numbers[2]; // set testptr directly from address of value in numbers array
+
     printf("First Fetch: %u\n", *testPtr);
-    for (size_t i = 0; i < 50; ++i) { // add a bunch of values to the numbers array forcing it to reallocate somewhere else
+    
+    // add a bunch of values to the numbers array forcing it to reallocate somewhere else
+    for (size_t i = 0; i < 50; ++i) { 
         numbers.push_back(5);
     }
+    
     printf("Second Fetch: %u\n", *testPtr); // notice that after lots of reallocations testPtr still points to the correct spot in the numbers vector
+    printf("Test Pointer 2: %u\n", *testPtr2); // notice that after lots of reallocations testPtr still points to the correct spot in the numbers vector
     printf("Serialized Value: %u\n", testPtr); // when serialized the value is just the offset value of the pointer
 }

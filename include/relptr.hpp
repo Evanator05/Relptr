@@ -3,8 +3,12 @@
 #include <cinttypes>
 #include <limits>
 
+#define RELPTR_TAG(name) struct name
+
 template<typename Tag, typename T>
 struct RelptrBase {
+    using value_type = T;
+    
     static inline T* base = nullptr;
 
     static void set_base(T* b) { base = b; }
@@ -13,31 +17,75 @@ struct RelptrBase {
 
 template<typename Tag, typename T>
 struct RelptrBaseVector {
+    using value_type = T;
     static inline std::vector<T>* vec = nullptr;
 
     static void set_base(std::vector<T>& v) { vec = &v; }
     static T* get_base() { return vec ? vec->data() : nullptr; }
 };
 
-template<typename T, typename BaseProvider, typename I = uint32_t>
-class Relptr {
+template<typename BaseProvider, typename I = uint32_t>
+struct Relptr {
 public:
-    I offset;
+    using T = typename BaseProvider::value_type;
 
+    I offset;
+    
     static constexpr I null_value =
         std::numeric_limits<I>::max();
 
     Relptr(I i) : offset(i) {}
+    Relptr(T *ptr) {
+        set_offset(ptr);
+    }
     Relptr() : offset(null_value) {}
 
-    T* Resolve() const {
+    T* resolve() const {
         if (offset == null_value) return nullptr;
 
         T* base = BaseProvider::get_base();
         return base + offset;
     }
 
-    T* operator->() const { return Resolve(); }
-    T& operator*() const { return *Resolve(); }
-    operator T*() const { return Resolve(); }
+    void set_offset(T *ptr) {
+        if (!ptr) {
+            offset = null_value;
+            return;
+        }
+
+        auto base = BaseProvider::get_base();
+        auto diff = ptr - base;
+
+        if (diff < 0) {
+            offset = null_value;
+            return;
+        }
+
+        offset = static_cast<I>(diff);
+    }
+
+    T* operator->() const { return resolve(); }
+    T& operator*() const { return *resolve(); }
+    operator T*() const { return resolve(); }
+
+    Relptr& operator=(T* ptr) {
+        set_offset(ptr);
+        return *this;
+    }
+
+    bool operator==(std::nullptr_t) const {
+        return offset == null_value;
+    }
+
+    bool operator!=(std::nullptr_t) const {
+        return offset != null_value;
+    }
+
+    bool operator==(const Relptr& other) const {
+        return offset == other.offset;
+    }
+
+    bool operator!=(const Relptr& other) const {
+        return offset != other.offset;
+    }
 };
