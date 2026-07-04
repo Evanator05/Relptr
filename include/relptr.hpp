@@ -2,6 +2,8 @@
 #include <vector>
 #include <cinttypes>
 #include <limits>
+#include <concepts>
+#include <type_traits>
 
 #define RELPTR_TAG(name) struct name
 
@@ -16,7 +18,7 @@ struct RelptrBase {
 };
 
 template<typename Tag, typename T>
-struct RelptrBaseVector {
+struct RelptrBaseVector : RelptrBase<Tag, T> {
     using value_type = T;
     static inline std::vector<T>* vec = nullptr;
 
@@ -24,12 +26,19 @@ struct RelptrBaseVector {
     static T* get_base() { return vec ? vec->data() : nullptr; }
 };
 
-template<typename BaseProvider, typename I = uint32_t>
+template<typename B>
+concept RelptrProvider =
+requires {
+    typename B::value_type;
+    { B::get_base() } -> std::same_as<typename B::value_type*>;
+};
+
+template<RelptrProvider BaseProvider, typename I = uint32_t>
 struct Relptr {
 public:
     using T = typename BaseProvider::value_type;
 
-    I offset;
+    I offset{};
     
     static constexpr I null_value =
         std::numeric_limits<I>::max();
@@ -70,6 +79,11 @@ public:
 
     Relptr& operator=(T* ptr) {
         set_offset(ptr);
+        return *this;
+    }
+
+    Relptr& operator=(Relptr<BaseProvider, I> ptr) {
+        offset = ptr.offset;
         return *this;
     }
 
