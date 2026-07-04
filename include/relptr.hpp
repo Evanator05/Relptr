@@ -82,11 +82,6 @@ public:
         return *this;
     }
 
-    Relptr& operator=(Relptr<BaseProvider, I> ptr) {
-        offset = ptr.offset;
-        return *this;
-    }
-
     bool operator==(std::nullptr_t) const {
         return offset == null_value;
     }
